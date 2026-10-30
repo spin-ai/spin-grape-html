@@ -223,3 +223,105 @@ export function parseCss(css) {
   parseInto(String(css || ""), null, rules, rawAtRules);
   return { rules, rawAtRules };
 }
+
+/**
+ * 把 GrapesJS 序列化出的紧凑 CSS 排版成多行，便于阅读、diff 和 Pi 做精确 edit。
+ * 只调整空白（并补齐结尾分号），不改变任何声明或顺序。
+ */
+export function formatCss(css) {
+  const source = String(css || "").trim();
+  if (!source) return "";
+
+  const pad = (level) => "  ".repeat(level);
+  const stack = [];
+  let out = "";
+  let indent = 0;
+  let quote = null;
+  let paren = 0;
+  let state = "prelude";
+  let boundary = 0;
+
+  const newline = () => {
+    out = out.replace(/\s+$/, "");
+    if (!out.endsWith("\n")) out += "\n";
+  };
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+
+    if (quote) {
+      out += char;
+      if (char === "\\") {
+        out += source[i + 1] ?? "";
+        i += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      out += char;
+      continue;
+    }
+
+    if (char === "(") {
+      paren += 1;
+      out += char;
+      continue;
+    }
+    if (char === ")") {
+      paren = Math.max(0, paren - 1);
+      out += char;
+      continue;
+    }
+
+    if (paren === 0 && char === "{") {
+      const prelude = out.slice(boundary).trim();
+      stack.push(state);
+      state = /^@media\b/i.test(prelude) ? "prelude" : "declarations";
+      out = `${out.replace(/\s+$/, "")} {\n`;
+      indent += 1;
+      out += pad(indent);
+      boundary = out.length;
+      continue;
+    }
+
+    if (paren === 0 && char === "}") {
+      // 补齐最后一条声明的分号
+      if (state === "declarations" && !/[;{]$/.test(out.trim())) out = `${out.replace(/\s+$/, "")};`;
+      newline();
+      indent = Math.max(0, indent - 1);
+      out += `${pad(indent)}}\n`;
+      if (indent === 0) out += "\n";
+      state = stack.pop() ?? "prelude";
+      boundary = out.length;
+      continue;
+    }
+
+    if (paren === 0 && char === ";") {
+      out += `;\n${pad(indent)}`;
+      boundary = out.length;
+      continue;
+    }
+
+    if (char === ":") {
+      out = out.replace(/\s+$/, "");
+      out += state === "declarations" ? ": " : ":";
+      continue;
+    }
+
+    if (char === "\n" || char === "\r" || char === "\t") continue;
+
+    if (char === " ") {
+      const previous = out[out.length - 1];
+      if (previous && previous !== " " && previous !== "\n" && previous !== "{") out += " ";
+      continue;
+    }
+
+    out += char;
+  }
+
+  return `${out.replace(/\s+$/, "")}\n`;
+}

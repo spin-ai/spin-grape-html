@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractTitle, mergeDocument, splitDocument, unwrapBody } from "../web/src/doc.js";
+import { extractTitle, mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "../web/src/doc.js";
 
 const SAMPLE = `<!DOCTYPE html>
 <html lang="en">
@@ -70,4 +70,13 @@ test("unwrapBody 去掉 GrapesJS 包裹的 body", () => {
   assert.equal(unwrapBody("<body><div>x</div></body>"), "<div>x</div>");
   assert.equal(unwrapBody("<div>x</div>"), "<div>x</div>");
   assert.equal(unwrapBody(""), "");
+});
+
+test("stripUnusedIds 清理临时 id，保留源文件 id 与被 CSS 引用的 id", () => {
+  const html = '<h1 id="hero">a</h1><em id="iy3li">b</em><p id="temp">c</p>';
+  const css = '#temp { color: red; }';
+  const out = stripUnusedIds(html, css, new Set(["hero"]));
+  assert.match(out, /id="hero"/);
+  assert.match(out, /id="temp"/);
+  assert.doesNotMatch(out, /iy3li/);
 });

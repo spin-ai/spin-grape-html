@@ -71,6 +71,20 @@ export function unwrapBody(html) {
   return (match ? match[1] : String(html || "")).trim();
 }
 
+/**
+ * 去掉 GrapesJS 自动生成、但没有任何样式规则引用的 id。
+ * GrapesJS 的 selectorManager(componentFirst) 会在选中/调样式时给元素塞临时 id，
+ * 不清理的话每次保存都会往源文件里写入随机 id。
+ */
+export function stripUnusedIds(html, css, sourceIds = new Set()) {
+  const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return String(html || "").replace(/\sid="([^"]+)"/g, (match, id) => {
+    if (sourceIds.has(id)) return match;
+    const referenced = new RegExp(`#${escapeRegExp(id)}(?![\\w-])`).test(css || "");
+    return referenced ? match : "";
+  });
+}
+
 /** 标题提取，用于页面下拉框。 */
 export function extractTitle(html, fallback = "未命名页面") {
   const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html || "");

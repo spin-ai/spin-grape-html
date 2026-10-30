@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCss, parseDeclarations } from "../web/src/css.js";
+import { formatCss, parseCss, parseDeclarations } from "../web/src/css.js";
 
 test("parseCss 保留 var() 与简写值", () => {
   const { rules } = parseCss(`
@@ -64,4 +64,15 @@ test("parseCss 兼容逗号选择器与伪类", () => {
   const { rules } = parseCss(".a:hover, .b > .c::after { color: var(--text); }");
   assert.equal(rules[0].selectors, ".a:hover, .b > .c::after");
   assert.equal(rules[0].style.color, "var(--text)");
+});
+
+test("formatCss 只调整空白，不丢声明", () => {
+  const input = ':root{--bg:#08090d;}body{background:var(--bg);border:1px solid var(--line);}@media (max-width: 900px){.a{margin:0 auto}}';
+  const output = formatCss(input);
+  assert.match(output, /^:root \{\n  --bg: #08090d;\n\}\n/m);
+  assert.match(output, /  background: var\(--bg\);/);
+  assert.match(output, /@media \(max-width: 900px\) \{\n  \.a \{\n    margin: 0 auto;\n  \}\n\}/);
+  const normalize = (value) => value.replace(/\s+/g, "").replace(/;}/g, "}");
+  assert.equal(normalize(output), normalize(input));
+  assert.equal(formatCss(""), "");
 });

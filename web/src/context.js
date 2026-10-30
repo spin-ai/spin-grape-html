@@ -35,6 +35,11 @@ export function setSourceIds(html) {
 
 const isSourceId = (id) => Boolean(id) && sourceIds.has(id);
 
+/** 当前页面的源文件 id 集合（保存时用于清理临时 id）。 */
+export function getSourceIds() {
+  return sourceIds;
+}
+
 /** 复制一份 DOM，去掉 GrapesJS 临时生成的 id，避免误导模型。 */
 function sanitizeClone(element) {
   const clone = element.cloneNode(true);

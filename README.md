@@ -109,6 +109,7 @@ pi --mode rpc --no-session --no-extensions --no-mcp --no-skills --no-prompt-temp
 - **设备预览**：桌面 / 平板 / 手机三档宽度
 - **预览与导出**：预览盖层与导出的 HTML 使用同一份 `mergeDocument` 输出
 - **历史版本**：每次让 Pi 动手前自动快照；恢复前也会再存一份，随时回退
+- **保存即可读的源码**：CSS 由自定义解析器写入 GrapesJS（保留 `var()` 与简写），保存时排版成多行、清理临时 id
 - **会话管理**：`新会话` 重置上下文；`停止` 中断当前运行；忙碌时继续发送会作为 steer 插入当前任务
 
 ## 目录结构
@@ -160,3 +161,5 @@ npm test        # 文档转换与 prompt 组装的单测
 - Pi 以 `--no-session` 运行，对话记录由服务端内存维护（刷新页面仍在，重启服务清空）。
 - 画布中的远端样式表是从原站加载的；离线环境下页面骨架仍可编辑，只是外部字体/图片可能缺失。
 - 页面约定为「完整 HTML 文档 + 内联 `<style>`」，脚本不会被执行。
+- GrapesJS 自带的 `setStyle(css)` 会丢掉 `background: var(--bg)` 这类声明，所以这里改为自己解析 CSS
+  （`web/src/css.js`）后用 `Css.setRule()` 写入；`@font-face`、`@keyframes` 等暂不参与可视化编辑，但会原样保留。

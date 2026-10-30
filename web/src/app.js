@@ -9,8 +9,9 @@ import {
   setCanvasContent,
   syncCanvasHead,
 } from "./editor.js";
-import { describeSelection, setSourceIds } from "./context.js";
-import { mergeDocument, splitDocument, unwrapBody } from "./doc.js";
+import { describeSelection, getSourceIds, setSourceIds } from "./context.js";
+import { formatCss } from "./css.js";
+import { mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "./doc.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -112,14 +113,17 @@ const chat = new ChatView({
  * ------------------------------------------------------------------ */
 
 function buildHtml() {
+  const css = formatCss(
+    [editor.getCss({ avoidProtected: true }), ...state.cssExtras].filter(Boolean).join("\n"),
+  );
+  const body = stripUnusedIds(unwrapBody(editor.getHtml()), css, getSourceIds());
+
   return mergeDocument({
     lang: state.docMeta.lang,
     head: state.docMeta.head,
     bodyAttrs: state.docMeta.bodyAttrs,
-    body: unwrapBody(editor.getHtml()),
-    css: [editor.getCss({ avoidProtected: true }), ...state.cssExtras]
-      .filter(Boolean)
-      .join("\n"),
+    body,
+    css,
   });
 }
 
