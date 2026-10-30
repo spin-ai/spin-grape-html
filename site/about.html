@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>关于 Nebula</title>
+<style>
+  :root { --bg: #08090d; --surface: #11131b; --line: rgba(255,255,255,0.08); --text: #f4f5f7; --muted: #9aa3b2; --accent: #7c5cff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "Inter", "Noto Sans SC", system-ui, sans-serif; }
+  .page { max-width: 900px; margin: 0 auto; padding: 80px 28px; }
+  .back { color: var(--muted); font-size: 14px; text-decoration: none; }
+  h1 { font-size: 48px; letter-spacing: -0.03em; margin: 26px 0 18px; }
+  .lede { color: var(--muted); font-size: 18px; line-height: 1.75; max-width: 640px; }
+  .team { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
+  .person { padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+  .avatar { width: 46px; height: 46px; border-radius: 50%; margin-bottom: 14px; background: linear-gradient(135deg, #a78bfa, #22d3ee); }
+  .person h3 { margin: 0 0 4px; font-size: 16px; }
+  .person p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .quote { margin-top: 64px; padding: 30px; border-left: 2px solid var(--accent); color: var(--muted); font-size: 17px; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <a class="back" href="index.html">← 返回首页</a>
+    <h1>关于 Nebula</h1>
+    <p class="lede">我们相信设计工具不该让人先学会写代码。Nebula 把可视化画布和语言模型接在一起，让“说出想法”成为最自然的编辑方式。</p>
+
+    <div class="team">
+      <article class="person"><div class="avatar"></div><h3>林可</h3><p>联合创始人 · 设计</p></article>
+      <article class="person"><div class="avatar"></div><h3>周野</h3><p>联合创始人 · 工程</p></article>
+      <article class="person"><div class="avatar"></div><h3>沈一</h3><p>产品 · 增长</p></article>
+    </div>
+
+    <div class="quote">“最好的界面是没有界面的——只要你描述得足够清楚，工具就该自己让开。”</div>
+  </div>
+</body>
+</html>

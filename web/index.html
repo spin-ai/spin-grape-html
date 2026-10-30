@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pi Canvas · 选中即改的 HTML 编辑器</title>
+<link rel="stylesheet" href="/vendor/grapesjs/css/grapes.min.css" />
+<link rel="stylesheet" href="/styles.css" />
+<script src="/vendor/grapesjs/grapes.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-group topbar-left">
+      <div class="logo">
+        <span class="logo-mark">π</span>
+        <span class="logo-text">Pi Canvas</span>
+      </div>
+      <span class="divider"></span>
+      <label class="page-picker">
+        <span class="page-picker-label">页面</span>
+        <select id="page-select" aria-label="选择页面"></select>
+      </label>
+      <button id="btn-new-page" class="icon-btn" title="新建页面" type="button">＋</button>
+    </div>
+
+    <div class="topbar-group topbar-center">
+      <span id="status-pill" class="status-pill" data-state="stopped">
+        <span class="pill-dot"></span>
+        <span class="pill-label">Pi 未连接</span>
+      </span>
+      <span id="model-label" class="model-label hidden"></span>
+    </div>
+
+    <div class="topbar-group topbar-right">
+      <div id="device-switch" class="segmented" role="group" aria-label="设备宽度">
+        <button type="button" data-device="desktop" class="active" title="桌面">▭</button>
+        <button type="button" data-device="tablet" title="平板">▯</button>
+        <button type="button" data-device="mobile" title="手机">▮</button>
+      </div>
+      <button id="btn-undo" class="icon-btn" title="撤销 ⌘Z" type="button">↶</button>
+      <button id="btn-redo" class="icon-btn" title="重做 ⇧⌘Z" type="button">↷</button>
+      <button id="btn-history" class="text-btn" type="button">历史</button>
+      <button id="btn-preview" class="text-btn" type="button">预览</button>
+      <button id="btn-export" class="text-btn" type="button">导出</button>
+      <button id="btn-save" class="primary-btn" type="button">保存</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar sidebar-left">
+      <div class="tabbar">
+        <button class="tab active" data-panel="blocks" type="button">区块</button>
+        <button class="tab" data-panel="layers" type="button">图层</button>
+      </div>
+      <div class="panel-body">
+        <div id="blocks" class="panel active" data-panel="blocks"></div>
+        <div id="layers" class="panel" data-panel="layers"></div>
+      </div>
+    </aside>
+
+    <section class="stage">
+      <div class="stage-hint">
+        <span class="hint-dot"></span>
+        点击选中元素 · 用 ⌘↵ 让 Pi 修改 · 拖拽左侧区块快速搭建
+      </div>
+      <div class="canvas-host">
+        <div id="gjs"></div>
+        <div id="sel-ring" class="sel-ring hidden"></div>
+        <div id="sel-bar" class="sel-bar hidden">
+          <div class="sel-bar-row">
+            <span id="sel-tag" class="sel-tag"></span>
+            <button type="button" class="sel-action primary" data-action="edit">✏️ 修改</button>
+            <button type="button" class="sel-action" data-action="ask">💬</button>
+            <button type="button" class="sel-action" data-action="style">🎨</button>
+            <button type="button" class="sel-close" data-action="close" title="取消选中">×</button>
+          </div>
+          <form id="sel-form" class="sel-form hidden">
+            <input id="sel-input" type="text" placeholder="例如：标题更大、加渐变文字" autocomplete="off" />
+            <button type="submit">↵</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar sidebar-right">
+      <div class="tabbar">
+        <button class="tab active" data-panel="copilot" type="button">Pi 助手</button>
+        <button class="tab" data-panel="styles" type="button">样式</button>
+        <button class="tab" data-panel="traits" type="button">属性</button>
+      </div>
+
+      <div class="panel-body">
+        <div class="panel active copilot" data-panel="copilot">
+          <div class="copilot-head">
+            <div class="copilot-title">
+              <span class="copilot-avatar">π</span>
+              <div>
+                <div class="copilot-name">Pi 编辑引擎</div>
+                <div id="composer-hint" class="copilot-sub">选中画布元素可获得精准上下文</div>
+              </div>
+            </div>
+            <div class="copilot-actions">
+              <button id="btn-abort" class="chip hidden" type="button">停止</button>
+              <button id="btn-start-pi" class="chip hidden" type="button">启动 Pi</button>
+              <button id="btn-reset" class="chip" type="button">新会话</button>
+            </div>
+          </div>
+
+          <div class="chat-scroll">
+            <div id="chat-empty" class="chat-empty">
+              <div class="empty-mark">π</div>
+              <h3>选中元素，直接说想怎么改</h3>
+              <p>画布负责“指哪”，Pi 负责“打哪”。它会读懂元素的选择器、DOM 与样式，只改你需要的那一块。</p>
+              <div class="empty-steps">
+                <span>1 · 点击画布元素</span>
+                <span>2 · 描述修改</span>
+                <span>3 · 画布自动刷新</span>
+              </div>
+              <div class="empty-suggestions">
+                <button type="button" data-prompt="把标题改得更有力量，保持一行以内">让标题更有力量</button>
+                <button type="button" data-prompt="整体换成暖色系，主色改为琥珀色与珊瑚色">换一套主色</button>
+                <button type="button" data-prompt="这个区块排版更紧凑一些，减少上下留白">排版更紧凑</button>
+              </div>
+            </div>
+            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          </div>
+
+          <form id="chat-form" class="composer">
+            <div id="composer-context" class="composer-context hidden"></div>
+            <textarea id="chat-input" rows="2" placeholder="描述修改，⌘↵ 发送" autocomplete="off"></textarea>
+            <div class="composer-row">
+              <span class="composer-tip">选中元素 → 上下文自动附加</span>
+              <button id="chat-send" class="send-btn" type="submit">发送</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="panel" data-panel="styles">
+          <div id="styles-container"></div>
+        </div>
+        <div class="panel" data-panel="traits">
+          <div id="traits-container"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-card">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-title">历史版本</div>
+        <div id="drawer-sub" class="drawer-sub"></div>
+      </div>
+      <button id="drawer-close" class="icon-btn" type="button">×</button>
+    </div>
+    <div class="drawer-note">每次让 Pi 动手前都会自动快照；恢复前也会再存一份。</div>
+    <div id="drawer-list" class="drawer-list"></div>
+  </div>
+</div>
+
+<div id="preview-overlay" class="preview-overlay hidden">
+  <div class="preview-bar">
+    <span>预览 · 与导出的 HTML 完全一致</span>
+    <button id="preview-close" class="text-btn" type="button">关闭 (Esc)</button>
+  </div>
+  <iframe id="preview-frame" class="preview-frame" title="页面预览"></iframe>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>

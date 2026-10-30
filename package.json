@@ -1,0 +1,20 @@
+{
+  "name": "spin-grape-html",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GrapesJS 可视化画布 + Pi Agent 编辑引擎：在页面上选中元素，用自然语言描述修改，Pi 精准改写源文件",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch-path=server server/index.js",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20.6"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^1.4.0",
+    "express": "^4.21.2",
+    "grapesjs": "^0.22.5"
+  }
+}
