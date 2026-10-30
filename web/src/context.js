@@ -24,6 +24,27 @@ const COMPUTED_PROPS = [
   "box-shadow",
 ];
 
+/** 源文件里出现过的 id 集合：GrapesJS 会为样式生成临时 id，不能当作定位依据。 */
+let sourceIds = new Set();
+
+export function setSourceIds(html) {
+  sourceIds = new Set(
+    [...String(html || "").matchAll(/\bid=["']([^"']+)["']/gi)].map((match) => match[1]),
+  );
+}
+
+const isSourceId = (id) => Boolean(id) && sourceIds.has(id);
+
+/** 复制一份 DOM，去掉 GrapesJS 临时生成的 id，避免误导模型。 */
+function sanitizeClone(element) {
+  const clone = element.cloneNode(true);
+  if (clone.id && !isSourceId(clone.id)) clone.removeAttribute("id");
+  for (const node of clone.querySelectorAll("[id]")) {
+    if (!isSourceId(node.id)) node.removeAttribute("id");
+  }
+  return clone;
+}
+
 const clip = (value, max) => {
   const text = String(value ?? "");
   return text.length > max ? `${text.slice(0, max)}…` : text;
@@ -38,7 +59,7 @@ export function cssPath(element) {
 
   while (node && node.nodeType === 1 && node !== doc.body && node !== doc.documentElement) {
     let part = node.tagName.toLowerCase();
-    if (node.id && !/^gjs-/.test(node.id)) {
+    if (isSourceId(node.id)) {
       parts.unshift(`${part}#${escape(node.id)}`);
       break;
     }
@@ -71,7 +92,7 @@ function componentPath(component) {
     if (!name || name === "body") break;
     let part = name;
     const attrs = (typeof node.getAttributes === "function" && node.getAttributes()) || {};
-    if (attrs.id) part += `#${attrs.id}`;
+    if (isSourceId(attrs.id)) part += `#${attrs.id}`;
     else if (attrs.class) {
       const classes = String(attrs.class)
         .split(/\s+/)
@@ -147,19 +168,21 @@ export function describeSelection(editor, file) {
   const classes = Array.from(element.classList || []).filter((name) => !/^(gjs|is-|no-)/.test(name));
   const parent = element.parentElement;
 
+  const safe = sanitizeClone(element);
+
   return {
     file,
     selector: cssPath(element),
     tag: element.tagName.toLowerCase(),
-    id: element.id && !/^gjs-/.test(element.id) ? element.id : "",
+    id: isSourceId(element.id) ? element.id : "",
     classes,
     path: componentPath(selected),
     text: clip((element.textContent || "").replace(/\s+/g, " ").trim(), 240),
     computed: Object.entries(computed)
       .map(([prop, value]) => `${prop}: ${value}`)
       .join("; "),
-    outerHTML: clip(element.outerHTML, 4000),
-    parentHTML: parent && parent !== doc.body ? clip(parent.outerHTML, 3000) : "",
+    outerHTML: clip(safe.outerHTML, 4000),
+    parentHTML: parent && parent !== doc.body ? clip(sanitizeClone(parent).outerHTML, 3000) : "",
     css: clip(relatedCss(editor, element), 3000),
   };
 }

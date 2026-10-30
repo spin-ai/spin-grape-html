@@ -50,6 +50,10 @@ export class Workspace {
     return path.join(this.siteDir, assertPageName(name));
   }
 
+  assertPageName(name) {
+    return assertPageName(name);
+  }
+
   async listPages() {
     const entries = await fs.readdir(this.siteDir, { withFileTypes: true });
     const pages = [];

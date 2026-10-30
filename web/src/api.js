@@ -46,6 +46,11 @@ export const api = {
   abort: () => request("/api/abort", { method: "POST" }),
   reset: () => request("/api/session/reset", { method: "POST" }),
   restart: () => request("/api/pi/restart", { method: "POST" }),
+  importUrl: (url) =>
+    request("/api/import-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
   reportCanvas: (payload) =>
     request("/api/canvas/state", {
       method: "POST",

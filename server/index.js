@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { PiRpc } from "./pi-rpc.js";
 import { Workspace } from "./workspace.js";
 import { buildPiArgs, buildSystemPrompt, composePrompt } from "./prompt.js";
+import { fetchRemotePage, slugForUrl } from "./importer.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.PORT || 8787);
@@ -617,6 +618,47 @@ app.post(
     res.json({ ok: true });
   }),
 );
+
+/* --- URL 导入 --- */
+
+app.post(
+  "/api/import-url",
+  asyncRoute(async (req, res) => {
+    const rawUrl = req.body?.url;
+    const result = await fetchRemotePage(rawUrl);
+
+    const existing = new Set((await workspace.listPages()).map((page) => page.name));
+    const base = slugForUrl(new URL(result.url));
+    let name = base;
+    let counter = 2;
+    while (existing.has(name)) {
+      name = base.replace(/\.html$/i, `-${counter}.html`);
+      counter += 1;
+    }
+
+    await workspace.writePage(name, result.html);
+    broadcast({ type: "pages_changed" });
+    res.json({
+      ok: true,
+      page: name,
+      title: result.title,
+      url: result.url,
+      warnings: result.warnings,
+      bytes: result.bytes,
+    });
+  }),
+);
+
+/** 在新标签页打开已保存的页面（真实 URL，可直接分享/调试）。 */
+app.get("/preview/:name", (req, res, next) => {
+  try {
+    workspace.assertPageName(req.params.name);
+  } catch (error) {
+    next(error);
+    return;
+  }
+  res.sendFile(workspace.pagePath(req.params.name), { headers: { "cache-control": "no-store" } });
+});
 
 /* --- 画布状态（前端上报 / 扩展读取） --- */
 

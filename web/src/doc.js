@@ -65,6 +65,12 @@ ${body.trim()}
 `;
 }
 
+/** GrapesJS 的 getHtml() 会带上外层 <body>，写入文档前需要剥掉。 */
+export function unwrapBody(html) {
+  const match = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(String(html || ""));
+  return (match ? match[1] : String(html || "")).trim();
+}
+
 /** 标题提取，用于页面下拉框。 */
 export function extractTitle(html, fallback = "未命名页面") {
   const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html || "");

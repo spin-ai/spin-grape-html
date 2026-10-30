@@ -1,4 +1,5 @@
 /* global grapesjs */
+import { parseCss } from "./css.js";
 
 const svg = (inner) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
@@ -226,9 +227,27 @@ export function syncCanvasHead(editor, head) {
   }
 }
 
+/**
+ * 载入页面到画布。
+ * CSS 不走 editor.setStyle（会丢 var() / 简写），而是解析成规则对象后用 setRule 写入。
+ * @returns {string[]} 暂不参与编辑的 at-rule（@font-face/@keyframes...），导出时补回
+ */
 export function setCanvasContent(editor, { body, css }) {
   editor.setComponents(body || '<section style="padding:80px;text-align:center;color:#8b93a3">空页面</section>');
-  editor.setStyle(css || "");
+
+  const { rules, rawAtRules } = parseCss(css);
+  editor.Css.clear();
+  for (const rule of rules) {
+    const opts = rule.atRule
+      ? { atRuleType: rule.atRule.type, atRuleParams: rule.atRule.params }
+      : undefined;
+    try {
+      editor.Css.setRule(rule.selectors, rule.style, opts);
+    } catch {
+      /* 极端选择器解析失败时跳过，避免整页载入中断 */
+    }
+  }
+  return rawAtRules;
 }
 
 export function canvasScroll(editor) {

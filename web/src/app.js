@@ -9,8 +9,8 @@ import {
   setCanvasContent,
   syncCanvasHead,
 } from "./editor.js";
-import { describeSelection } from "./context.js";
-import { mergeDocument, splitDocument } from "./doc.js";
+import { describeSelection, setSourceIds } from "./context.js";
+import { mergeDocument, splitDocument, unwrapBody } from "./doc.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,6 +39,15 @@ const els = {
   selTag: $("sel-tag"),
   selForm: $("sel-form"),
   selInput: $("sel-input"),
+  openUrl: $("btn-open-url"),
+  openTab: $("btn-open-tab"),
+  urlDialog: $("url-dialog"),
+  urlForm: $("url-form"),
+  urlInput: $("url-input"),
+  urlStatus: $("url-status"),
+  urlSubmit: $("url-submit"),
+  urlClose: $("url-close"),
+  urlCancel: $("url-cancel"),
 };
 
 const state = {
@@ -51,6 +60,7 @@ const state = {
   piError: null,
   selection: null,
   selectionAt: 0,
+  cssExtras: [],
   lastReloadAt: 0,
 };
 
@@ -84,6 +94,8 @@ const editor = createEditor({
   },
 });
 
+window.__editor = editor;
+
 const chat = new ChatView({
   log: $("chat-log"),
   empty: $("chat-empty"),
@@ -104,8 +116,10 @@ function buildHtml() {
     lang: state.docMeta.lang,
     head: state.docMeta.head,
     bodyAttrs: state.docMeta.bodyAttrs,
-    body: editor.getHtml(),
-    css: editor.getCss(),
+    body: unwrapBody(editor.getHtml()),
+    css: [editor.getCss({ avoidProtected: true }), ...state.cssExtras]
+      .filter(Boolean)
+      .join("\n"),
   });
 }
 
@@ -126,7 +140,8 @@ async function loadPage(name, { selector = null, scrollTop = 0, quiet = false } 
   state.current = name;
   state.docMeta = { lang: parts.lang, head: parts.head, bodyAttrs: parts.bodyAttrs };
 
-  setCanvasContent(editor, { body: parts.body, css: parts.css });
+  setSourceIds(parts.body);
+  state.cssExtras = setCanvasContent(editor, { body: parts.body, css: parts.css });
   syncCanvasHead(editor, parts.head);
   restoreCanvasScroll(editor, scrollTop);
   markDirty(false);
@@ -279,10 +294,13 @@ function positionSelectionBar() {
   els.selRing.style.height = `${height}px`;
 
   const barWidth = els.selBar.offsetWidth || 300;
+  const barHeight = els.selBar.offsetHeight || 42;
   const barLeft = Math.min(Math.max(10, left), window.innerWidth - barWidth - 12);
-  const barTop = Math.max(58, top - 46);
+  const above = top - barHeight - 10;
+  // 顶部空间不足时放到元素下方，底部不足则贴住视口
+  const barTop = above > 60 ? above : Math.min(top + height + 10, window.innerHeight - barHeight - 12);
   els.selBar.style.left = `${barLeft}px`;
-  els.selBar.style.top = `${barTop}px`;
+  els.selBar.style.top = `${Math.max(58, barTop)}px`;
 }
 
 function startSelectionLoop() {
@@ -409,6 +427,10 @@ connectEvents({
         handleCanvasReload(event);
         break;
 
+      case "pages_changed":
+        refreshPages().catch(() => {});
+        break;
+
       default:
         break;
     }
@@ -525,6 +547,57 @@ els.newPage.addEventListener("click", async () => {
   }
 });
 
+els.openUrl.addEventListener("click", () => openUrlDialog());
+els.openTab.addEventListener("click", async () => {
+  if (!state.current) return;
+  try {
+    if (state.dirty) await savePage({ silent: true });
+    window.open(`/preview/${encodeURIComponent(state.current)}`, "_blank", "noopener");
+  } catch (error) {
+    toast(error.message, "error");
+  }
+});
+
+els.urlClose.addEventListener("click", () => closeUrlDialog());
+els.urlCancel.addEventListener("click", () => closeUrlDialog());
+els.urlInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    els.urlForm.requestSubmit();
+  }
+});
+
+els.urlForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const url = els.urlInput.value.trim();
+  if (!url) {
+    setUrlStatus("请输入要打开的 URL", "error");
+    return;
+  }
+
+  els.urlSubmit.disabled = true;
+  setUrlStatus("正在抓取页面…首次加载可能需要几秒", "pending");
+
+  try {
+    if (state.dirty) await savePage({ silent: true });
+    const result = await api.importUrl(url);
+    await refreshPages();
+    await loadPage(result.page);
+    closeUrlDialog();
+
+    const warning = result.warnings?.[0];
+    toast(
+      `已导入 ${result.page}（${(result.bytes / 1024).toFixed(0)} KB）${warning ? ` · ${warning}` : ""}`,
+      warning ? "warning" : "success",
+    );
+    chat.notice(`已从 ${result.url} 导入为新页面 ${result.page}。现在可以选中元素让 Pi 修改。`, "info");
+  } catch (error) {
+    setUrlStatus(error.message, "error");
+  } finally {
+    els.urlSubmit.disabled = false;
+  }
+});
+
 els.save.addEventListener("click", () => savePage().catch((error) => toast(error.message, "error")));
 els.undo.addEventListener("click", () => editor.UndoManager.undo());
 els.redo.addEventListener("click", () => editor.UndoManager.redo());
@@ -558,6 +631,29 @@ els.deviceSwitch.addEventListener("click", (event) => {
   for (const sibling of els.deviceSwitch.querySelectorAll("button")) {
     sibling.classList.toggle("active", sibling === button);
   }
+});
+
+function openUrlDialog() {
+  els.urlDialog.classList.remove("hidden");
+  setUrlStatus("", null);
+  els.urlInput.value = "";
+  requestAnimationFrame(() => els.urlInput.focus());
+}
+
+function closeUrlDialog() {
+  els.urlDialog.classList.add("hidden");
+  els.urlSubmit.disabled = false;
+}
+
+function setUrlStatus(text, tone) {
+  els.urlStatus.textContent = text || "";
+  els.urlStatus.className = "dialog-status";
+  if (!text) els.urlStatus.classList.add("hidden");
+  else if (tone) els.urlStatus.classList.add(tone);
+}
+
+els.urlDialog.addEventListener("click", (event) => {
+  if (event.target === els.urlDialog) closeUrlDialog();
 });
 
 els.history.addEventListener("click", () => openDrawer());
@@ -725,6 +821,10 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Escape") {
+    if (!els.urlDialog.classList.contains("hidden")) {
+      closeUrlDialog();
+      return;
+    }
     if (!els.previewOverlay.classList.contains("hidden")) {
       els.previewClose.click();
       return;

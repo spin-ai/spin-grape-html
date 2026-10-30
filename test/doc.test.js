@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractTitle, mergeDocument, splitDocument } from "../web/src/doc.js";
+import { extractTitle, mergeDocument, splitDocument, unwrapBody } from "../web/src/doc.js";
 
 const SAMPLE = `<!DOCTYPE html>
 <html lang="en">
@@ -64,4 +64,10 @@ test("空文档不会抛错", () => {
   assert.equal(parts.body, "");
   assert.equal(parts.css, "");
   assert.match(mergeDocument(parts), /<body>\n\n<\/body>/);
+});
+
+test("unwrapBody 去掉 GrapesJS 包裹的 body", () => {
+  assert.equal(unwrapBody("<body><div>x</div></body>"), "<div>x</div>");
+  assert.equal(unwrapBody("<div>x</div>"), "<div>x</div>");
+  assert.equal(unwrapBody(""), "");
 });
