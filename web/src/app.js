@@ -11,7 +11,7 @@ import {
 } from "./editor.js";
 import { describeSelection, getSourceIds, setSourceIds } from "./context.js";
 import { formatCss } from "./css.js";
-import { mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "./doc.js";
+import { containsMermaid, mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "./doc.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -49,6 +49,12 @@ const els = {
   urlSubmit: $("url-submit"),
   urlClose: $("url-close"),
   urlCancel: $("url-cancel"),
+  selMermaid: $("sel-mermaid"),
+  mermaidDialog: $("mermaid-dialog"),
+  mermaidSource: $("mermaid-source"),
+  mermaidApply: $("mermaid-apply"),
+  mermaidClose: $("mermaid-close"),
+  mermaidCancel: $("mermaid-cancel"),
 };
 
 const state = {
@@ -112,15 +118,45 @@ const chat = new ChatView({
  * 文档 / 保存 / 载入
  * ------------------------------------------------------------------ */
 
-function buildHtml() {
+const MERMAID_HEAD = {
+  cdn: `<script type="module" data-pi-mermaid-bootstrap>
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });
+</script>`,
+  local: `<script src="/vendor/mermaid/mermaid.min.js" data-pi-mermaid-bootstrap></script>
+<script data-pi-mermaid-bootstrap>
+  mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });
+</script>`,
+};
+
+const MERMAID_STYLE = `pre.mermaid { background: transparent; text-align: center; margin: 0; }
+pre.mermaid svg { max-width: 100%; height: auto; }`;
+
+/**
+ * 按需把 Mermaid 运行时写进 head：
+ *  - 保存 / 导出用 CDN，HTML 可以独立打开
+ *  - 应用内预览用本地 /vendor，离线也能出图
+ * 已有的 bootstrap 会被替换，避免重复注入。
+ */
+function headWithMermaid(head, bodyHtml, runtime) {
+  const cleaned = String(head || "").replace(
+    /<script\b[^>]*data-pi-mermaid-bootstrap[^>]*>[\s\S]*?<\/script>\s*/gi,
+    "",
+  );
+  if (!containsMermaid(bodyHtml)) return cleaned;
+  return `${cleaned}\n${MERMAID_HEAD[runtime] || MERMAID_HEAD.cdn}\n<style data-pi-mermaid-bootstrap>\n${MERMAID_STYLE}\n</style>`;
+}
+
+function buildHtml({ mermaidRuntime = "cdn" } = {}) {
   const css = formatCss(
     [editor.getCss({ avoidProtected: true }), ...state.cssExtras].filter(Boolean).join("\n"),
   );
   const body = stripUnusedIds(unwrapBody(editor.getHtml()), css, getSourceIds());
+  const head = headWithMermaid(state.docMeta.head, body, mermaidRuntime);
 
   return mergeDocument({
     lang: state.docMeta.lang,
-    head: state.docMeta.head,
+    head,
     bodyAttrs: state.docMeta.bodyAttrs,
     body,
     css,
@@ -254,9 +290,14 @@ function toast(text, level = "info", { action = null, timeout = 4200 } = {}) {
  * 选中浮层
  * ------------------------------------------------------------------ */
 
+function isMermaidSelection() {
+  return state.selection?.tag === "pre" && (state.selection?.classes || []).includes("mermaid");
+}
+
 function showSelectionBar() {
   if (!state.selection) return;
   els.selTag.textContent = state.selection.selector || state.selection.tag || "";
+  els.selMermaid.classList.toggle("hidden", !isMermaidSelection());
   els.selBar.classList.remove("hidden");
   els.selRing.classList.remove("hidden");
   positionSelectionBar();
@@ -619,7 +660,7 @@ els.export.addEventListener("click", () => {
 });
 
 els.preview.addEventListener("click", () => {
-  els.previewFrame.srcdoc = buildHtml();
+  els.previewFrame.srcdoc = buildHtml({ mermaidRuntime: "local" });
   els.previewOverlay.classList.remove("hidden");
 });
 
@@ -634,6 +675,55 @@ els.deviceSwitch.addEventListener("click", (event) => {
   editor.setDevice(button.dataset.device);
   for (const sibling of els.deviceSwitch.querySelectorAll("button")) {
     sibling.classList.toggle("active", sibling === button);
+  }
+});
+
+function selectedMermaidComponent() {
+  const component = editor.getSelected?.();
+  if (!component) return null;
+  return component.get?.("type") === "mermaid" ? component : null;
+}
+
+function openMermaidDialog() {
+  const component = selectedMermaidComponent();
+  if (!component) {
+    toast("请先选中一个 Mermaid 图表", "warning");
+    return;
+  }
+  els.mermaidSource.value = component.get("mermaidSource") || "";
+  els.mermaidDialog.classList.remove("hidden");
+  requestAnimationFrame(() => els.mermaidSource.focus());
+}
+
+function closeMermaidDialog() {
+  els.mermaidDialog.classList.add("hidden");
+}
+
+els.mermaidApply.addEventListener("click", () => {
+  const component = selectedMermaidComponent();
+  if (!component) {
+    closeMermaidDialog();
+    return;
+  }
+  const source = els.mermaidSource.value.trim();
+  if (!source) {
+    toast("Mermaid 源码不能为空", "warning");
+    return;
+  }
+  component.set("mermaidSource", source);
+  closeMermaidDialog();
+  toast("图表已更新", "success");
+});
+
+els.mermaidClose.addEventListener("click", () => closeMermaidDialog());
+els.mermaidCancel.addEventListener("click", () => closeMermaidDialog());
+els.mermaidDialog.addEventListener("click", (event) => {
+  if (event.target === els.mermaidDialog) closeMermaidDialog();
+});
+els.mermaidSource.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
+    els.mermaidApply.click();
   }
 });
 
@@ -785,6 +875,9 @@ els.selBar.addEventListener("click", (event) => {
     els.selRing.classList.add("hidden");
     chat.input.focus();
     chat.input.placeholder = `描述对 ${state.selection?.selector || "选中元素"} 的修改…`;
+  } else if (action === "mermaid") {
+    openMermaidDialog();
+    els.selForm.classList.add("hidden");
   } else if (action === "style") {
     const button = document.querySelector('[data-panel="styles"]');
     button?.click();
@@ -825,6 +918,10 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Escape") {
+    if (!els.mermaidDialog.classList.contains("hidden")) {
+      closeMermaidDialog();
+      return;
+    }
     if (!els.urlDialog.classList.contains("hidden")) {
       closeUrlDialog();
       return;

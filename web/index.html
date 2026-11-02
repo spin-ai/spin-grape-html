@@ -84,6 +84,7 @@
             <span id="sel-tag" class="sel-tag"></span>
             <button type="button" class="sel-action primary" data-action="edit">✏️ 修改</button>
             <button type="button" class="sel-action" data-action="ask">💬</button>
+            <button type="button" class="sel-action hidden" id="sel-mermaid" data-action="mermaid">源码</button>
             <button type="button" class="sel-action" data-action="style">🎨</button>
             <button type="button" class="sel-close" data-action="close" title="取消选中">×</button>
           </div>
@@ -157,6 +158,23 @@
       </div>
     </aside>
   </main>
+</div>
+
+<div id="mermaid-dialog" class="dialog-backdrop hidden">
+  <div class="dialog dialog-wide">
+    <div class="dialog-head">
+      <div>
+        <div class="dialog-title">编辑 Mermaid 源码</div>
+        <div class="dialog-sub">页面里保存的就是这段源码，画布与预览会实时渲染；Pi 也可以直接改它。</div>
+      </div>
+      <button id="mermaid-close" class="icon-btn" type="button" title="关闭">×</button>
+    </div>
+    <textarea id="mermaid-source" class="dialog-code" spellcheck="false" rows="12"></textarea>
+    <div class="dialog-actions">
+      <button id="mermaid-cancel" class="text-btn" type="button">取消</button>
+      <button id="mermaid-apply" class="primary-btn" type="button">应用</button>
+    </div>
+  </div>
 </div>
 
 <div id="url-dialog" class="dialog-backdrop hidden">

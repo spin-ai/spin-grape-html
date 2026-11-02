@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractTitle, mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "../web/src/doc.js";
+import { containsMermaid, extractTitle, mergeDocument, splitDocument, stripUnusedIds, unwrapBody } from "../web/src/doc.js";
 
 const SAMPLE = `<!DOCTYPE html>
 <html lang="en">
@@ -79,4 +79,11 @@ test("stripUnusedIds 清理临时 id，保留源文件 id 与被 CSS 引用的 i
   assert.match(out, /id="hero"/);
   assert.match(out, /id="temp"/);
   assert.doesNotMatch(out, /iy3li/);
+});
+
+test("containsMermaid 识别图表块", () => {
+  assert.equal(containsMermaid('<pre class="mermaid">graph TD;A-->B</pre>'), true);
+  assert.equal(containsMermaid('<pre class="box mermaid">x</pre>'), true);
+  assert.equal(containsMermaid('<pre class="code">x</pre>'), false);
+  assert.equal(containsMermaid(""), false);
 });

@@ -47,6 +47,7 @@ test("buildSystemPrompt 包含编辑纪律", () => {
   assert.match(prompt, /只改用户描述的那一个元素/);
   assert.match(prompt, /保留现有的 id、class/);
   assert.match(prompt, /canvas_state/);
+  assert.match(prompt, /pre class="mermaid"/);
   assert.match(prompt, /about\.html/);
 });
 

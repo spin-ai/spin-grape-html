@@ -609,3 +609,22 @@ button { font-family: inherit; }
 .dialog-status.pending { border-color: rgba(34, 211, 238, 0.3); color: #a5f3fc; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .dialog-actions .primary-btn[disabled] { opacity: 0.55; cursor: default; }
+
+.dialog-wide { width: 660px; }
+.dialog-code {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  background: #0a0b10;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  color: #cdd3e1;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  outline: none;
+  white-space: pre;
+  overflow: auto;
+}
+.dialog-code:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.14); }

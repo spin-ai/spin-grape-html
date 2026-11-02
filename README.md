@@ -4,17 +4,14 @@
 
 它不试图重造一个编辑器，而是给 Pi 装上「眼睛」和「手脚」：
 
-```
-┌──────────────────────────────────────────────┐
-│  画布层   GrapesJS（拖拽 / 样式面板 / 图层）    │  ← 人负责"指哪"
-├──────────────────────────────────────────────┤
-│  桥接层   <ui-context> 结构化上下文 + 扩展工具  │
-│           canvas_state / canvas_reload        │
-├──────────────────────────────────────────────┤
-│  执行层   Pi RPC 子进程：read / edit / write    │  ← Pi 负责"打哪"
-├──────────────────────────────────────────────┤
-│  状态层   自动快照 + 版本恢复 + 会话树          │
-└──────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  UI["GrapesJS 画布<br/>拖拽 / 样式 / 图层"] -->|"选区 + 指令"| BR["ui-context 桥接<br/>canvas_state / canvas_reload"]
+  BR --> PI["Pi RPC 会话<br/>read / edit / write"]
+  PI -->|"最小 diff"| FS["页面源文件"]
+  FS --> WATCH["文件监听"]
+  WATCH -->|"SSE 通知"| UI
+  PI -->|"画布状态"| UI
 ```
 
 ## 快速开始
@@ -108,6 +105,9 @@ pi --mode rpc --no-session --no-extensions --no-mcp --no-skills --no-prompt-temp
 - **样式与属性**：右侧「样式 / 属性」面板是 GrapesJS 原生的 Style Manager 与 Traits
 - **设备预览**：桌面 / 平板 / 手机三档宽度
 - **预览与导出**：预览盖层与导出的 HTML 使用同一份 `mergeDocument` 输出
+- **Mermaid 架构图**：左侧「图表 → Mermaid 架构图」插入，画布实时渲染成 SVG；
+  选中后点浮层上的「源码」可直接改，Pi 也能改源文件里的 `<pre class="mermaid">`。
+  保存 / 导出会自动注入 Mermaid 运行时，应用内预览使用本地 `/vendor/mermaid`，离线可用
 - **历史版本**：每次让 Pi 动手前自动快照；恢复前也会再存一份，随时回退
 - **保存即可读的源码**：CSS 由自定义解析器写入 GrapesJS（保留 `var()` 与简写），保存时排版成多行、清理临时 id
 - **会话管理**：`新会话` 重置上下文；`停止` 中断当前运行；忙碌时继续发送会作为 steer 插入当前任务
@@ -131,6 +131,8 @@ web/
   src/editor.js   GrapesJS 初始化、区块、画布载入
   src/context.js  从选区提取结构化上下文
   src/chat.js     对话与工具卡片渲染
+  src/css.js      CSS 解析 / 规则写入 / 多行排版
+  src/mermaid.js  画布内的 Mermaid 运行时注入与渲染
   src/doc.js      HTML 文档 ↔ 画布模型（纯函数，可单测）
   src/markdown.js 轻量 Markdown 渲染
   src/api.js      请求与 SSE 封装
@@ -160,6 +162,8 @@ npm test        # 文档转换与 prompt 组装的单测
 - 服务默认只监听 `127.0.0.1`；URL 导入接口具备 SSRF 能力，不要直接暴露到公网。
 - Pi 以 `--no-session` 运行，对话记录由服务端内存维护（刷新页面仍在，重启服务清空）。
 - 画布中的远端样式表是从原站加载的；离线环境下页面骨架仍可编辑，只是外部字体/图片可能缺失。
-- 页面约定为「完整 HTML 文档 + 内联 `<style>`」，脚本不会被执行。
+- 页面约定为「完整 HTML 文档 + 内联 `<style>`」，页面里的脚本不会在画布中执行。
+- Mermaid 图表在文件里保存为 `<pre class="mermaid">源码</pre>`；保存时会转义 `>` / `<` / `&`，
+  浏览器解析后仍是原始源码，导出页面可直接独立打开（运行时来自 CDN）。
 - GrapesJS 自带的 `setStyle(css)` 会丢掉 `background: var(--bg)` 这类声明，所以这里改为自己解析 CSS
   （`web/src/css.js`）后用 `Css.setRule()` 写入；`@font-face`、`@keyframes` 等暂不参与可视化编辑，但会原样保留。

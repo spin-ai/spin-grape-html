@@ -84,6 +84,18 @@ export function cssPath(element) {
     node = node.parentElement;
   }
 
+  // 从最短的后缀开始尝试，选第一个在文档中唯一的选择器（例如 pre.mermaid）
+  for (let start = parts.length - 1; start >= 0; start -= 1) {
+    const candidate = parts.slice(start).join(" > ");
+    // 单个裸标签（例如 em）虽然唯一但太脆弱，至少保留一层结构或 class/id
+    if (!candidate.includes(".") && !candidate.includes("#") && !candidate.includes(">")) continue;
+    try {
+      if (doc.querySelectorAll(candidate).length === 1) return candidate;
+    } catch {
+      /* 忽略无法解析的选择器 */
+    }
+  }
+
   return parts.join(" > ");
 }
 
@@ -174,6 +186,12 @@ export function describeSelection(editor, file) {
   const parent = element.parentElement;
 
   const safe = sanitizeClone(element);
+  const isMermaid = element.tagName === "PRE" && element.classList.contains("mermaid");
+  const mermaidSource = isMermaid
+    ? typeof selected.get === "function"
+      ? selected.get("mermaidSource")
+      : ""
+    : "";
 
   return {
     file,
@@ -182,11 +200,15 @@ export function describeSelection(editor, file) {
     id: isSourceId(element.id) ? element.id : "",
     classes,
     path: componentPath(selected),
-    text: clip((element.textContent || "").replace(/\s+/g, " ").trim(), 240),
+    text: isMermaid
+      ? clip(String(mermaidSource || "").replace(/\s+/g, " ").trim(), 240)
+      : clip((element.textContent || "").replace(/\s+/g, " ").trim(), 240),
     computed: Object.entries(computed)
       .map(([prop, value]) => `${prop}: ${value}`)
       .join("; "),
-    outerHTML: clip(safe.outerHTML, 4000),
+    outerHTML: mermaidSource
+      ? `<pre class="mermaid">${mermaidSource}</pre>`
+      : clip(safe.outerHTML, 4000),
     parentHTML: parent && parent !== doc.body ? clip(sanitizeClone(parent).outerHTML, 3000) : "",
     css: clip(relatedCss(editor, element), 3000),
   };

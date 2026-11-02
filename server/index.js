@@ -702,6 +702,7 @@ app.post("/api/canvas/reload", requireCanvasToken, (req, res) => {
 /* --- 静态资源 --- */
 
 app.use("/vendor/grapesjs", express.static(path.join(ROOT, "node_modules", "grapesjs", "dist"), { maxAge: "1h" }));
+app.use("/vendor/mermaid", express.static(path.join(ROOT, "node_modules", "mermaid", "dist"), { maxAge: "1h" }));
 app.use(express.static(path.join(ROOT, "web"), { extensions: ["html"] }));
 
 app.use((req, res) => {

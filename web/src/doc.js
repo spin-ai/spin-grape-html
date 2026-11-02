@@ -85,6 +85,11 @@ export function stripUnusedIds(html, css, sourceIds = new Set()) {
   });
 }
 
+/** 页面里是否包含 Mermaid 图表（决定是否注入运行时）。 */
+export function containsMermaid(html) {
+  return /class=["'][^"']*\bmermaid\b/i.test(String(html || ""));
+}
+
 /** 标题提取，用于页面下拉框。 */
 export function extractTitle(html, fallback = "未命名页面") {
   const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html || "");

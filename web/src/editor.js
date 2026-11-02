@@ -1,5 +1,6 @@
 /* global grapesjs */
 import { parseCss } from "./css.js";
+import { renderMermaid, resetMermaid } from "./mermaid.js";
 
 const svg = (inner) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
@@ -98,6 +99,19 @@ const BLOCKS = [
     category: "基础",
     media: svg('<rect x="4" y="9" width="16" height="6" rx="3"/>'),
     content: `<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;border:1px solid rgba(124,92,255,.35);background:rgba(124,92,255,.12);color:#c9bdff;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase">New</span>`,
+  },
+  {
+    id: "mermaid",
+    label: "Mermaid 架构图",
+    category: "图表",
+    media: svg('<rect x="3" y="4" width="7" height="5" rx="1"/><rect x="14" y="4" width="7" height="5" rx="1"/><rect x="8.5" y="15" width="7" height="5" rx="1"/><path d="M6.5 9v3h11V9M12 12v3"/>'),
+    content: `<pre class="mermaid">flowchart LR
+  UI["GrapesJS 画布"] -->|选区 + 指令| BR["ui-context 桥接"]
+  BR --> PI["Pi RPC 会话"]
+  PI -->|read / edit| FS["页面源文件"]
+  FS --> WATCH["文件监听"]
+  WATCH -->|SSE 通知| UI
+  PI -->|canvas_state| UI</pre>`,
   },
   {
     id: "divider",
@@ -205,7 +219,12 @@ export function createEditor({ container, blocksEl, layersEl, stylesEl, traitsEl
   editor.on("update", () => onUpdate?.());
   editor.on("component:selected", (component) => onSelect?.(component));
   editor.on("component:deselected", () => onDeselect?.());
-  editor.on("canvas:frame:load", () => onSelect?.(editor.getSelected()));
+  editor.on("canvas:frame:load", () => {
+    resetMermaid();
+    onSelect?.(editor.getSelected());
+  });
+
+  registerMermaidType(editor);
 
   return editor;
 }
@@ -220,7 +239,8 @@ export function syncCanvasHead(editor, head) {
   const template = doc.createElement("template");
   template.innerHTML = head;
   for (const node of Array.from(template.content.children)) {
-    if (!["LINK", "META", "TITLE", "SCRIPT"].includes(node.tagName)) continue;
+    // 页面 head 里的 script 不在画布里执行（避免远端脚本干扰编辑器）
+    if (!["LINK", "META", "TITLE"].includes(node.tagName)) continue;
     const clone = node.cloneNode(true);
     clone.setAttribute("data-pi-head", "1");
     doc.head.appendChild(clone);
@@ -276,4 +296,74 @@ export function findComponent(editor, selector) {
   } catch {
     return null;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Mermaid 组件
+ * ------------------------------------------------------------------ */
+
+const escapeHtml = (value) =>
+  String(value).replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char]);
+
+function registerMermaidType(editor) {
+  editor.DomComponents.addType("mermaid", {
+    isComponent: (element) =>
+      element?.tagName === "PRE" && element.classList?.contains("mermaid"),
+
+    model: {
+      defaults: {
+        tagName: "pre",
+        classes: ["mermaid"],
+        droppable: false,
+        editable: false,
+        selectable: true,
+        mermaidSource: "",
+        traits: [
+          {
+            type: "text",
+            name: "mermaidSource",
+            label: "Mermaid 源码",
+            changeProp: true,
+          },
+        ],
+      },
+
+      init() {
+        if (this.get("mermaidSource")) return;
+        const fromChildren = this.components()
+          .map((child) => child.get?.("content") ?? "")
+          .join("")
+          .trim();
+        const source = fromChildren || this.getEl?.()?.textContent?.trim() || "";
+        this.set("mermaidSource", source, { silent: true });
+      },
+
+      toHTML() {
+        const source = this.get("mermaidSource") || "";
+        return `<pre class="mermaid">${escapeHtml(source)}</pre>`;
+      },
+    },
+
+    view: {
+      onRender() {
+        if (!this._mermaidBound) {
+          this._mermaidBound = true;
+          this.listenTo(this.model, "change:mermaidSource", this.renderDiagram);
+        }
+        queueMicrotask(() => this.renderDiagram());
+      },
+
+      renderDiagram() {
+        const element = this.el;
+        const source = this.model.get("mermaidSource");
+        element.innerHTML = "";
+        element.removeAttribute("data-processed");
+        renderMermaid(editor, element, source).catch((error) => {
+          element.innerHTML = `<span class="mermaid-error">Mermaid 渲染失败：${escapeHtml(
+            error.message,
+          )}</span>`;
+        });
+      },
+    },
+  });
 }

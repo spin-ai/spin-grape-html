@@ -221,6 +221,13 @@ export const DEFAULT_PAGES = {
   .person h3 { margin: 0 0 4px; font-size: 16px; }
   .person p { margin: 0; color: var(--muted); font-size: 13.5px; }
   .quote { margin-top: 64px; padding: 30px; border-left: 2px solid var(--accent); color: var(--muted); font-size: 17px; line-height: 1.8; }
+  .diagram { margin-top: 64px; }
+  .diagram h2 { margin: 0 0 18px; font-size: 26px; letter-spacing: -0.02em; }
+  pre.mermaid {
+    margin: 0; padding: 24px; text-align: center; overflow-x: auto;
+    background: #11131b; border: 1px solid var(--line); border-radius: 16px;
+  }
+  pre.mermaid svg { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -236,6 +243,16 @@ export const DEFAULT_PAGES = {
     </div>
 
     <div class="quote">“最好的界面是没有界面的——只要你描述得足够清楚，工具就该自己让开。”</div>
+
+    <section class="diagram">
+      <h2>它是怎么工作的</h2>
+      <pre class="mermaid">flowchart LR
+  UI["GrapesJS 画布"] -->|"选区 + 指令"| BR["ui-context 桥接"]
+  BR --> PI["Pi RPC 会话"]
+  PI -->|"read / edit"| FS["页面源文件"]
+  FS --> WATCH["文件监听"]
+  WATCH -->|"SSE 通知"| UI</pre>
+    </section>
   </div>
 </body>
 </html>
